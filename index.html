@@ -523,24 +523,19 @@
   function vibrar(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
 
   // --- Notificaciones cuando la app NO está en foco ---
+  // Delegadas al paquete compartido del ecosistema (window.__ccNotif, cableado
+  // por el <script type="module"> del final). El disparo (SW / new Notification)
+  // y el permiso los maneja el controlador común.
   async function pedirNotif() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      try { await Notification.requestPermission(); } catch {}
-    }
+    if (window.__ccNotif) await window.__ccNotif.requestPermission();
   }
   async function notificar(titulo, cuerpo) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
     if (!document.hidden) return; // solo si la app no está visible
-    const opt = {
-      body: cuerpo, icon: 'icon-192.png', badge: 'icon-192.png',
-      tag: 'gymbro', renotify: true, vibrate: [120,60,120]
-    };
-    try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg && reg.showNotification) { await reg.showNotification(titulo, opt); return; }
-    } catch {}
-    try { new Notification(titulo, opt); } catch {}
+    if (!window.__ccNotif) return;
+    await window.__ccNotif.notify('phase', {
+      title: titulo, body: cuerpo, icon: 'icon-192.png', badge: 'icon-192.png',
+      tag: 'gymbro', renotify: true, vibrate: [120, 60, 120]
+    });
   }
 
   // --- Wake lock para mantener la pantalla encendida ---
@@ -803,6 +798,12 @@
   });
 </script>
   <script type="module" src="https://cdn.jsdelivr.net/npm/@closerclick/closer-click-support@0.3/src/index.js"></script>
+  <!-- Notificaciones compartidas del ecosistema: el controlador maneja permiso y
+       disparo (SW / new Notification). GymBro solo avisa el cambio de fase. -->
+  <script type="module">
+    import { createNotifications } from 'https://cdn.jsdelivr.net/npm/@closerclick/closer-click-notifications@0.1/src/index.js'
+    window.__ccNotif = createNotifications({ storageKey: 'gymbro', categories: [], sound: false })
+  </script>
   <!-- Navegación "volver" unificada del ecosistema: chevron del header + botón
        físico de Android / gesto de iOS / atrás del navegador → cierra el modal
        de config; si no hay nada → closer.click. -->
